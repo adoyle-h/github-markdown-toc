@@ -1,14 +1,19 @@
-FROM debian
+ARG ALPINE_VER=3.17.2
+FROM alpine:$ALPINE_VER
 
-RUN apt update -y && \
-  apt upgrade -y && \
-  apt install curl -y
+ARG APK_PROXY
+RUN if [ -n "$APK_PROXY" ]; then \
+  cp /etc/apk/repositories /etc/apk/repositories.bak && \
+  sed -i "s|dl-cdn.alpinelinux.org|$APK_PROXY|g" /etc/apk/repositories ; \
+  fi
 
-WORKDIR app
+RUN apk add --no-cache curl bash gawk
+
+WORKDIR /app
 
 COPY gh-md-toc .
 
 RUN chmod +x gh-md-toc
 
 ENTRYPOINT ["./gh-md-toc"]
-CMD []
+CMD ["/app/README.md"]

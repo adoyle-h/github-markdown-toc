@@ -27,6 +27,8 @@ gh_toc_version="0.8.0"
 
 gh_user_agent="gh-md-toc v$gh_toc_version"
 
+UNORDERED_SYMBOL=${UNORDERED_SYMBOL:--}
+
 #
 # Download rendered into html README.md by its url.
 #
@@ -118,7 +120,7 @@ gh_toc(){
     local gh_ttl_docs=$2
     local need_replace=$3
     local no_backup=$4
-    local no_footer=$5
+    local show_footer=$5
     local indent=$6
     local skip_header=$7
 
@@ -131,9 +133,6 @@ gh_toc(){
     # Show "TOC" string only if working with one document
     if [ "$gh_ttl_docs" = "1" ]; then
 
-        echo "Table of Contents"
-        echo "================="
-        echo ""
         gh_src_copy=""
 
     fi
@@ -179,14 +178,14 @@ gh_toc(){
             local dt=`date +'%F_%H%M%S'`
             local ext=".orig.${dt}"
             local toc_path="${gh_src}.toc.${dt}"
-            local toc_createdby="<!-- Created by https://github.com/ekalinin/github-markdown-toc -->"
+            local toc_createdby="<!-- Created by https://github.com/adoyle-h/github-markdown-toc -->"
             local toc_footer="<!-- Added by: `whoami`, at: `date` -->"
             # http://fahdshariff.blogspot.ru/2012/12/sed-mutli-line-replacement-between-two.html
             # clear old TOC
             sed -i${ext} "/${ts}/,/${te}/{//!d;}" "$gh_src"
             # create toc file
             echo "${toc}" > "${toc_path}"
-            if [ "${no_footer}" != "yes" ]; then
+            if [ "${show_footer}" == "yes" ]; then
                 echo -e "\n${toc_createdby}\n${toc_footer}\n" >> "$toc_path"
             fi
 
@@ -218,43 +217,44 @@ gh_toc(){
 # $2 - number of spaces used to indent.
 #
 gh_toc_grab() {
-    common_awk_script='
-                     modified_href = ""
-                     split(href, chars, "")
-                     for (i=1;i <= length(href); i++) {
-                         c = chars[i]
-                         res = ""
-                         if (c == "+") {
-                             res = " "
-                         } else {
-                             if (c == "%") {
-                                 res = "\\x"
-                             } else {
-                                 res = c ""
-                             }
-                         }
-                         modified_href = modified_href res
-                    }
-                    print sprintf("%*s", (level-1)*'"$2"', "") "* [" text "](" gh_url  modified_href ")"
-                    '
+    common_awk_script="
+      modified_href = \"\"
+      split(href, chars, \"\")
+      for (i=1;i <= length(href); i++) {
+          c = chars[i]
+          res = \"\"
+          if (c == \"+\") {
+              res = \" \"
+          } else {
+              if (c == \"%\") {
+                  res = \"\\\\x\"
+              } else {
+                  res = c \"\"
+              }
+          }
+          modified_href = modified_href res
+      }
+      print sprintf(\"%*s\", (level-1)*\"\$2\", \"\") \"${UNORDERED_SYMBOL} [\" text \"](\" gh_url  modified_href \")\"
+    "
+
     if [ `uname -s` == "OS/390" ]; then
         grepcmd="pcregrep -o"
         echoargs=""
         awkscript='{
-                     level = substr($0, length($0), 1)
-                     text = substr($0, match($0, /a>.*<\/h/)+2, RLENGTH-5)
-                     href = substr($0, match($0, "href=\"([^\"]+)?\"")+6, RLENGTH-7)
-                     '"$common_awk_script"'
-                }'
+          level = substr($0, length($0), 1)
+          text = substr($0, match($0, /a>.*<\/h/)+2, RLENGTH-5)
+          href = substr($0, match($0, "href=\"([^\"]+)?\"")+6, RLENGTH-7)
+          '"$common_awk_script"'
+        }'
     else
         grepcmd="grep -Eo"
         echoargs="-e"
         awkscript='{
-                     level = substr($0, length($0), 1)
-                     text = substr($0, match($0, /a>.*<\/h/)+2, RLENGTH-5)
-                     href = substr($0, match($0, "href=\"[^\"]+?\"")+6, RLENGTH-7)
-                     '"$common_awk_script"'
-                }'
+          level = substr($0, length($0), 1)
+          text = substr($0, match($0, /a>.*<\/h/)+2, RLENGTH-5)
+          href = substr($0, match($0, "href=\"[^\"]+?\"")+6, RLENGTH-7)
+          '"$common_awk_script"'
+        }'
     fi
     href_regex='href=\"[^\"]+?\"'
 
@@ -383,9 +383,9 @@ gh_toc_app() {
         shift
     fi
 
-    if [ "$1" = '--hide-footer' ]; then
+    if [ "$1" = '--show-footer' ]; then
         need_replace="yes"
-        no_footer="yes"
+        show_footer="yes"
         shift
     fi
 
@@ -398,11 +398,8 @@ gh_toc_app() {
     for md in "$@"
     do
         echo ""
-        gh_toc "$md" "$#" "$need_replace" "$no_backup" "$no_footer" "$indent" "$skip_header"
+        gh_toc "$md" "$#" "$need_replace" "$no_backup" "$show_footer" "$indent" "$skip_header"
     done
-
-    echo ""
-    echo "<!-- Created by https://github.com/ekalinin/github-markdown-toc -->"
 }
 
 #

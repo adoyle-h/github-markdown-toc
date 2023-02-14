@@ -7,3 +7,6 @@ test:
 
 lint:
 	@shellcheck -e SC2008 gh-md-toc
+
+build-image:
+	docker build -t adoyle/toc:0.8 --build-arg "APK_PROXY=mirrors.ustc.edu.cn" .
